@@ -30,7 +30,6 @@ static NSString * const TextSearchParameters = @"&fields=items(title,link,image)
 - (IBAction)searchTextPushed
 {
     [self deleteOldSearchResults];
-    [self.searchBar resignFirstResponder];
     [self performSearch:[self.searchBar text] withParameters:TextSearchParameters];
     
     TextResultsViewController *controller = [[TextResultsViewController alloc] initWithNibName:@"TextResultsViewController" bundle:nil];
@@ -42,7 +41,6 @@ static NSString * const TextSearchParameters = @"&fields=items(title,link,image)
 - (IBAction)searchImagePushed
 {
     [self deleteOldSearchResults];
-//    [self.searchBar resignFirstResponder];
     [self performSearch:[self.searchBar text] withParameters:ImageSearchParameters];
 
     ImagesResultsViewController *controller = [[ImagesResultsViewController alloc] initWithNibName:@"ImagesResultsViewController" bundle:nil];
@@ -54,7 +52,6 @@ static NSString * const TextSearchParameters = @"&fields=items(title,link,image)
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    
     [self.searchBar becomeFirstResponder];
 }
 
@@ -116,6 +113,8 @@ static NSString * const TextSearchParameters = @"&fields=items(title,link,image)
             return;
         }
     }
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"ParsingFinished" object:self];
+    NSLog(@"parse finishes");
 }
 
 - (void)deleteOldSearchResults

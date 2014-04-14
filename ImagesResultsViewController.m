@@ -12,7 +12,7 @@
 
 static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
 
-@interface ImagesResultsViewController () <UITableViewDataSource, UITableViewDelegate, NSFetchedResultsControllerDelegate, UITextViewDelegate, UINavigationBarDelegate>
+@interface ImagesResultsViewController () <UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, UINavigationBarDelegate>
 
 @property (weak, nonatomic) IBOutlet UITableView *tableView;
 
@@ -20,41 +20,16 @@ static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
 
 @implementation ImagesResultsViewController
 {
-    NSFetchedResultsController *_fetchedResultsController;
+    NSArray *_searchResults;
 }
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
 {
     self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
     if (self) {
-        // Custom initialization
+
     }
     return self;
-}
-
-- (NSFetchedResultsController *)fetchedResultsController
-{
-    if (_fetchedResultsController == nil) {
-        
-        NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
-        
-        NSEntityDescription *entity = [NSEntityDescription entityForName:@"SearchResult" inManagedObjectContext:self.managedObjectContext];
-        [fetchRequest setEntity:entity];
-        
-        NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"linkName" ascending:YES];
-        [fetchRequest setSortDescriptors:@[sortDescriptor]];
-        
-        [fetchRequest setFetchBatchSize:10];
-        
-        _fetchedResultsController = [[NSFetchedResultsController alloc]
-                                     initWithFetchRequest:fetchRequest
-                                     managedObjectContext:self.managedObjectContext
-                                     sectionNameKeyPath:nil
-                                     cacheName:nil];
-        
-        _fetchedResultsController.delegate = self;
-    }
-    return _fetchedResultsController;
 }
 
 - (IBAction)done
@@ -70,21 +45,35 @@ static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
     
     UINib *cellNib = [UINib nibWithNibName:ImageCellIdentifier bundle:nil];
     [self.tableView registerNib:cellNib forCellReuseIdentifier:ImageCellIdentifier];
-    [self performFetch];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receiveParseNotification:) name:@"ParsingFinished" object:nil];
 }
 
-- (void)performFetch
+- (void)receiveParseNotification:(NSNotification *)notification
 {
+    NSFetchRequest *fetchRequest = [[NSFetchRequest alloc] init];
+    
+    NSEntityDescription *entity = [NSEntityDescription entityForName:@"SearchResult" inManagedObjectContext:self.managedObjectContext];
+    [fetchRequest setEntity:entity];
+    
+    NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"linkName" ascending:YES];
+    [fetchRequest setSortDescriptors:@[sortDescriptor]];
+    
+    [fetchRequest setFetchBatchSize:10];
+    
     NSError *error;
-    if (![self.fetchedResultsController performFetch:&error]) {
+    NSArray *foundsObjects = [self.managedObjectContext executeFetchRequest:fetchRequest error:&error];
+    if (foundsObjects == nil) {
         NSLog(@"Fatal core Data error %@", error);
         return;
     }
+    _searchResults = foundsObjects;
+    [self.tableView reloadData];
 }
 
 - (void)dealloc
 {
-    _fetchedResultsController.delegate = nil;
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 #pragma mark UINavigationBaDelegate
@@ -105,8 +94,8 @@ static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    id <NSFetchedResultsSectionInfo> sectionInfo = [self.fetchedResultsController sections][section];
-    return [sectionInfo numberOfObjects];
+    NSLog(@"row quantity is %d", [_searchResults count]);
+    return [_searchResults count];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -114,7 +103,7 @@ static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
     
     ImageSearchResultCell *cell = (ImageSearchResultCell *)[tableView dequeueReusableCellWithIdentifier:ImageCellIdentifier];
 
-    SearchResult *searchResult = [self.fetchedResultsController objectAtIndexPath:indexPath];
+    SearchResult *searchResult = _searchResults[indexPath.row];
     [cell configureSearchResult:searchResult];
     return cell;
 }
@@ -124,47 +113,6 @@ static NSString * const ImageCellIdentifier = @"ImageSearchResultCell";
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-}
-
-
-#pragma mark - NSFetchedResultsControllerDelegate
-
-- (void)controllerWillChangeContent:(NSFetchedResultsController *)controller
-{
-//    NSLog(@"*** controllerWillChangeContent");
-    [self.tableView beginUpdates];
-}
-
-- (void)controller:(NSFetchedResultsController *)controller didChangeObject:(id)anObject atIndexPath:(NSIndexPath *)indexPath forChangeType:(NSFetchedResultsChangeType)type newIndexPath:(NSIndexPath *)newIndexPath
-{
-    switch (type) {
-        case NSFetchedResultsChangeInsert:
-//            NSLog(@"*** NSFetchedResultsChangeInsert (object)");
-            [self.tableView insertRowsAtIndexPaths:@[newIndexPath] withRowAnimation:UITableViewRowAnimationFade];
-            break;
-            
-        case NSFetchedResultsChangeDelete:
-//            NSLog(@"*** NSFetchedResultsChangeDelete (object)");
-            [self.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-            break;
-            
-        case NSFetchedResultsChangeUpdate:
-//            NSLog(@"*** NSFetchedResultsChangeUpdate (object)");
-            [self.tableView cellForRowAtIndexPath:indexPath] ;
-            break;
-            
-        case NSFetchedResultsChangeMove:
-//            NSLog(@"*** NSFetchedResultsChangeMove (object)");
-            [self.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-            [self.tableView insertRowsAtIndexPaths:@[newIndexPath] withRowAnimation:UITableViewRowAnimationFade];
-            break;
-    }
-}
-
-- (void)controllerDidChangeContent:(NSFetchedResultsController *)controller
-{
-//    NSLog(@"*** controllerDidChangeContent");
-    [self.tableView endUpdates];
 }
 
 @end
